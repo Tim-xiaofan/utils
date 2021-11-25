@@ -20,7 +20,7 @@ endif
 endif
 
 # Add flag 
-CFLAGS += -g -Wall -O3
+CFLAGS += -g -Wall -O3 -fPIC
 CC=gcc
 
 
@@ -31,7 +31,7 @@ CC=gcc
 $(LIB) : $(OBJS)
 	rm -f $@
 #ar cr $@ $(OBJS)
-	$(CC) -shared -o $@ $(OBJS)
+	$(CC) -shared -o $@ $(OBJS) 
 	rm -f $(OBJS)
 
 #$(APP): $(SRCS-y) Makefile 
