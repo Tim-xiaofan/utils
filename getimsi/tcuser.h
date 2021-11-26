@@ -45,16 +45,15 @@ struct hdr
 struct param
 {
     string name;
-    string len;
-    string  value;
+    string value;
     
     ~param(){};
-    param(const uint8_t n, uint8_t l, const string & v= "");
-    param(const uint8_t n, uint8_t l, const string & v= "");
-    param(const string & n = "", const string & l = "", const string & v= "")
-        :name(n), len(l), value(v){}
+    param(const string & n = "", const string & v= "")
+        :name(n), value(v){}
     friend ostream &operator<<(ostream & os, const param & p); 
     bool operator==(const param & a) const {return a.name == name;}
+    string pack(void) const {return name + len2hexstr() + value;}
+    string len2hexstr(void) const;
 };
 
 struct params
@@ -71,7 +70,7 @@ struct params
     friend ostream &operator<<(ostream & os, const params & ps);
     void parse_bin(const uint8_t * pptr, int mlen);
     void update(const param & p);
-    void pack(string & hexstr) const;
+    string & pack(string & hexstr) const;
 };
 
 struct tcuser_conf
@@ -79,7 +78,11 @@ struct tcuser_conf
     string saddr;
     string daddr;
     string number; 
-    string params;
+    vector<string> params;
+    string filename;
+    string smod;
+    string dmod;
+    tcuser_conf():filename("./script/tcuser.ms7"), smod("ef"), dmod("14"){}
     friend ostream & operator<<(ostream & os, const tcuser_conf & tc);
 };
 

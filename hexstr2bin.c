@@ -24,7 +24,7 @@ static int get_char(int i)
     if(i >= 0 && i <= 9)
       return '0' + i;
     else if(i >= 10 && i <= 15)
-      return 'a' + i - 10;
+      return 'A' + i - 10;
     else 
       return '#';
 }

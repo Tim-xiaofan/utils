@@ -3,6 +3,7 @@
 #include <iostream>
 #include <iomanip>
 #include <cstdio>
+#include "common.h"
 
 using std::cout;
 using std::cerr;
@@ -13,7 +14,7 @@ using std::endl;
 ostream &operator<<(ostream & os, const param & p)
 {
     os << "<"<< p.name << ","
-        << p.len << ","
+        << p.len2hexstr() << ","
         << p.value << ">";
     return os;
 }
@@ -30,16 +31,29 @@ ostream &operator<<(ostream & os, const params & ps)
 
 ostream & operator<<(ostream & os, const tcuser_conf & tc)
 {
-    os << "saddr:" << tc.saddr
-        << ",daddr:" << tc.daddr
-        << ",number:" << tc.number
-        << ",params:" << tc.params;
+    os  << "saddr: \t" << tc.saddr << endl
+        << "daddr: \t" << tc.daddr << endl
+        << "number:\t" << tc.number << endl
+        << "params:\t";
+    for(uint32_t i = 0; i < tc.params.size(); ++i)
+      os << tc.params[i] << " ";
+    os << endl;
+    os  << "smod:  \t" << tc.smod << endl
+        << "dmod:  \t" << tc.dmod << endl
+        << "file:  \t" << tc.filename;
     return os;
 }
 
-void params::
+string & params::
 pack(string & hexstr) const
 {
+    uint32_t i;
+    
+    hexstr = "";
+    hexstr += primitive_type;
+    for(i = 0; i < vp.size(); ++i)
+      hexstr += vp[i].pack();
+    return hexstr;
 }
 
 int params::
@@ -68,45 +82,34 @@ construct(const uint8_t * hexstr, int len)
 void params::
 parse_bin(const uint8_t * pptr, int mlen)
 {
-    char name[3], len[3], type[3];
-    uint8_t _len;
+    uint8_t len;
     int i, j;
     char value[128];
     param p;
 
     //printf("total len = %d\n", mlen);
     //printf("primitive type: %02x\n", *pptr);
-    sprintf(type, "%02x", *pptr);
-    primitive_type = type;
+    primitive_type = hex2str(pptr, 1, false);
     ++pptr;--mlen;
     while(mlen > 0)
     {
         if(*pptr == 0)
         {
-            //printf("reach to zero, mlen = %d\n", 
-            //            mlen);
             break;
         }
-        sprintf(name, "%02x", *pptr);
-        //printf("name: (%s) ", name);
+        p.name = hex2str(pptr, 1, false);
         ++pptr;--mlen;
         
-        sprintf(len, "%02x", *pptr);
-        _len = *pptr; 
-        //printf("len: (%s) ", len);
+        len = *pptr; 
         ++pptr;--mlen;
         
-        //cout << "value : ";
-        for(i = 0, j = 0; i < _len; ++i, ++pptr, --mlen, j+=2)
+        for(i = 0, j = 0; i < len; ++i, ++pptr, --mlen, j+=2)
         {
-            //printf("%02x", *pptr);
             bin2hexstr((uint8_t *)pptr, 1, (uint8_t *)&value[j], 2);
         }
-        //printf("\n");
         value[j] = '\0';
-        p = param(name, len, value);
+        p.value = value;
         push(p);
-        //cout << "p :" << p << endl;
     }
 }
 
@@ -129,11 +132,10 @@ construct(const string & hexstr)
     return construct((const uint8_t *)hexstr.c_str(), hexstr.length());
 }
 
-param::
-param(const uint8_t n, uint8_t l, const string & v)
+
+string param::
+len2hexstr(void) const
 {
-    char t[3], t1[3];
-    sprintf(t, "%02x", n);
-    sprintf(t1, "%02x", l);
-    param(t, t1, v);
+    uint8_t len = value.length() / 2;
+    return hex2str(&len, 1, false);
 }

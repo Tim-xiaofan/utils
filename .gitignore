@@ -2,3 +2,6 @@ test/main
 *.o
 *.so
 *.a
+*core*
+*tags*
+test/getimsi

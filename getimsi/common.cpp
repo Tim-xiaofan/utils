@@ -11,7 +11,7 @@ string hex2str(const uchar *buf, size_t cnt, bool neat)
 {
 	unsigned short Li, LMax, ToDo, Bi, Ai;
     char Ascii[80];
-    char tmp[32];
+    char tmp[80];
     unsigned char B;
     string out;
 

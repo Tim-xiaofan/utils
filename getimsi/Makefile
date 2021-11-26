@@ -1,5 +1,5 @@
 # binary name
-APP = main
+APP = getimsi
 
 # all source are stored in SRCS-y
 SRCS-y := main.cpp tcuser.cpp SccpAddr.cpp common.cpp
