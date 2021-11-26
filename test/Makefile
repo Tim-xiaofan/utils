@@ -2,7 +2,7 @@
 APP = main
 
 # all source are stored in SRCS-y
-SRCS-y := main.cpp
+SRCS-y := main.cpp tcuser.cpp SccpAddr.cpp common.cpp
 
 ifeq ($(OS),Windows_NT)
 		PLATFORM="Windows"
