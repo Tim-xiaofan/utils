@@ -82,7 +82,10 @@ struct tcuser_conf
     string filename;
     string smod;
     string dmod;
-    tcuser_conf():filename("./script/tcuser.ms7"), smod("ef"), dmod("14"){}
+    bool encode;
+    tcuser_conf():
+        filename("./script/tcuser.ms7"), 
+        smod("ef"), dmod("14"), encode(false){}
     friend ostream & operator<<(ostream & os, const tcuser_conf & tc);
 };
 

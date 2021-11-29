@@ -40,7 +40,8 @@ ostream & operator<<(ostream & os, const tcuser_conf & tc)
     os << endl;
     os  << "smod:  \t" << tc.smod << endl
         << "dmod:  \t" << tc.dmod << endl
-        << "file:  \t" << tc.filename;
+        << "file:  \t" << tc.filename << endl
+        << "encode:\t" << std::boolalpha <<tc.encode;
     return os;
 }
 
@@ -87,8 +88,6 @@ parse_bin(const uint8_t * pptr, int mlen)
     char value[128];
     param p;
 
-    //printf("total len = %d\n", mlen);
-    //printf("primitive type: %02x\n", *pptr);
     primitive_type = hex2str(pptr, 1, false);
     ++pptr;--mlen;
     while(mlen > 0)

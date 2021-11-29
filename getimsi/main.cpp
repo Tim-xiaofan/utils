@@ -24,8 +24,8 @@ using std::string;
 
 #define MSG1 "080301010402000f0111a10f02010102013a0407a14483153254f600"
 #define MSG2 "020601020704430200080804430100080d0ba109060704000001001a0200"
-#define TYPE1 "M-tc781-i0000"
-#define TYPE2 "M-tc783-i0000"
+#define TYPE1 "M-tc781-i0003"
+#define TYPE2 "M-tc783-i0003"
 
 static tcuser_conf conf;
 
@@ -33,14 +33,15 @@ static void
 print_help(const char * program)
 {
     fprintf(stderr, "usage : %s\n", program);
-    cerr << "\t-a\t" << "sccp dest addr" << endl;
-    cerr << "\t-g\t" << "sccp src addr" << endl;
-    cerr << "\t-N\t" << "number" << endl;
-    cerr << "\t-p\t" << "params to parse" << endl;
-    cerr << "\t-f\t" << "file to save scripts, default scripts/tcuser.ms7" << endl;
-    cerr << "\t-m\t" << "src mod, default ef" << endl;
-    cerr << "\t-u\t" << "dest mod, default 14" << endl;
-    cerr << "\t-h\t" << "help" << endl;
+    cerr << "\t-a\t--daddr \t" << "sccp dest addr" << endl;
+    cerr << "\t-g\t--saddr \t" << "sccp src addr" << endl;
+    cerr << "\t-N\t--number\t" << "number" << endl;
+    cerr << "\t-p\t--params\t" << "params to parse" << endl;
+    cerr << "\t-f\t--file  \t" << "file to save scripts, default scripts/tcuser.ms7" << endl;
+    cerr << "\t-m\t--smod  \t" << "src mod, default ef" << endl;
+    cerr << "\t-u\t--dmod  \t" << "dest mod, default 14" << endl;
+    cerr << "\t-u\t--encode\t" << "whether encode sccp addrs(trur or false), default false" << endl;
+    cerr << "\t-h\t--help  \t" << "help" << endl;
     cerr << "\texample:";
     cerr << "\t" <<  program << " -a434227 -g431226 -N11100 -m2d -u15 -fmy.ms7 "
         "-p080301010402000F010FA10BB02010102013A10403A11101F0 " << endl;
@@ -58,26 +59,28 @@ print_bytes(const Bytes & bytes)
 }
 
 #define FIXED_0 "A1"
-#define FIXED_1 "02010102013A104"
-#define FIXED_SZ 8
+#define FIXED_1 "02010102013A04"
+#define FIXED_SZ 9
 
 static string &
 add_number(const string & n, string & cpnt)
 {
     //a1 0f 02 01 01 02 01 3a 04 07 a1 44 83 15 32 54 f6
+    cout << "number : " << n << endl;
     Bytes bytes;
     uint8_t len;
     string _len;
     str2bcd(n, &bytes, (uint8_t)0xf);
+    //cout << "bcd:";
+    //print_bytes(bytes);
     len = FIXED_SZ + bytes.size();
     _len = hex2str(&len, 1, false);
 
     cpnt.clear();
     cpnt += FIXED_0;
     cpnt += _len;
-    cpnt.push_back(_len[1]);
     cpnt += FIXED_1;
-    len = bytes.size(); 
+    len = bytes.size() + 1; 
     cpnt += hex2str(&len, 1, false);
     cpnt += FIXED_0;
     cpnt += hex2str(bytes.data(), bytes.size(), false);
@@ -104,11 +107,7 @@ test(const uint8_t * hexstr, int len)
     
     sa.addrInd(PC_NO, SSN_INC, GT_T4, ROUTE_GT);
     sa.ssn(6).natAddrInd(4).numPlan(1);
-    cout << conf.daddr << endl;
-    sa.gt(conf.daddr);
-    sa.pack(&bytes);
-    print_bytes(bytes);
-
+    
     cout << endl << endl;
 
     cout << "********MSG1*********" << endl;
@@ -120,7 +119,7 @@ test(const uint8_t * hexstr, int len)
     cout << "after update" << endl;
     cout << ps << endl;
     cout << "pack:" << ps.pack(_pack)<< endl;
-    fprintf(fp, "%s-f%s-d%s-p%s\n", 
+    fprintf(fp, "%s-f%s-d%s-s00-p%s00\n", 
                 TYPE1, conf.smod.c_str(),
                 conf.dmod.c_str(), _pack.c_str());
 
@@ -130,18 +129,34 @@ test(const uint8_t * hexstr, int len)
     ps.construct(MSG2); 
     cout << "before update" << endl;
     cout << ps << endl;
-    ps.update(param(NAME_DADDR, 
-                    hex2str(bytes.data(), bytes.size(), false)));
-    sa.gt(conf.saddr);
-    bytes.clear();
-    //bytes = sa.gt();
-    sa.pack(&bytes);
-    ps.update(param(NAME_SADDR, 
-                    hex2str(bytes.data(), bytes.size(), false)));
+    if(conf.encode)
+    {
+        sa.gt(conf.daddr);
+        sa.pack(&bytes);
+        print_bytes(bytes);
+
+        ps.update(param(NAME_DADDR, 
+                        hex2str(bytes.data(), 
+                            bytes.size(), 
+                            false)));
+        sa.gt(conf.saddr);
+        bytes.clear();
+        //bytes = sa.gt();
+        sa.pack(&bytes);
+        ps.update(param(NAME_SADDR, 
+                        hex2str(bytes.data(), 
+                            bytes.size(),
+                            false)));
+    }
+    else
+    {
+        ps.update(param(NAME_DADDR, conf.daddr));
+        ps.update(param(NAME_SADDR, conf.saddr));
+    }
     cout << "after update" << endl;
     cout << ps << endl;
     cout << "pack:" << ps.pack(_pack)<< endl;
-    fprintf(fp, "%s-f%s-d%s-p%s\n", 
+    fprintf(fp, "%s-f%s-d%s-s00-p%s00\n", 
                 TYPE2, conf.smod.c_str(),
                 conf.dmod.c_str(), _pack.c_str());
 
@@ -183,42 +198,43 @@ static void
 handle_options(int argc, char *argv[])
 {
 	int opt, longindex;
-	const char * const optstring = "a:g:N:hp:f:m:u:";
+	const char * const optstring = "a:g:N:hp:f:m:u:e:";
 	struct option longopts[] = {
 		{ "daddr", required_argument, 0, 'a' },
 		{ "saddr", required_argument, 0, 'g' },
 		{ "number", required_argument, 0, 'N' },
 		{ "params", required_argument, 0, 'p' },
 		{ "file", required_argument, 0, 'f' },
-		{ "src mod", required_argument, 0, 'm' },
-		{ "dest mod", required_argument, 0, 'u' },
+		{ "smod", required_argument, 0, 'm' },
+		{ "dmod", required_argument, 0, 'u' },
+		{ "encode", required_argument, 0, 'e' },
 		{ "help", no_argument,       0, 'h' },
 		{ 0,      no_argument,       0, 0 }
 	};
 	
-    while ((opt = getopt_long(argc, argv, optstring, longopts, &longindex)) != -1)
+    while ((opt = getopt_long(argc, 
+                        argv, 
+                        optstring, 
+                        longopts, 
+                        &longindex)) != -1)
 	{
 		switch (opt)
 		{
 			case 'a':
                 conf.daddr = optarg;
-				//cout << "dest addr = " << optarg << endl;
 				break;
 			case 'g':
                 conf.saddr = optarg;
-				//cout << "source addr = " << optarg << endl;
 				break;
 			case 'N':
                 conf.number = optarg;
-				//cout << "number = " << optarg << endl;
 				break;
 			case 'p':
                 conf.params.push_back(optarg);
-				//cout << "number = " << optarg << endl;
 				break;
 			case 'h':
                 print_help(argv[0]);
-				exit(EXIT_SUCCESS);
+				exit(EXIT_FAILURE);
 				break;
             case 'f':
                 conf.filename = optarg;
@@ -229,10 +245,18 @@ handle_options(int argc, char *argv[])
             case 'u':
                 conf.dmod = optarg;
                 break;
+            case 'e':
+                conf.encode = (strcmp(optarg,"true") == 0);
+                break;
+            case ':':
+                cerr << "option " << argv[longindex] 
+                    << "required argument" << endl;
+                break;
+            case '?':
 			default:
-                cerr << "unknown opt " << opt << endl;
+                cerr << " unrecognized option " << (char)opt << endl;
                 print_help(argv[0]);
-				exit(EXIT_SUCCESS);
+				exit(EXIT_FAILURE);
 				break;
 		}
 	}
