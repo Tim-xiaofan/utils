@@ -1,7 +1,7 @@
 #ifndef SCCPADDR_H_
 #define SCCPADDR_H_
 
-#include "sccpdefs.h"
+#include "SccpDefs.h"
 
 #include <string>
 

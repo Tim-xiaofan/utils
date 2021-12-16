@@ -2,7 +2,8 @@
 APP = getimsi
 
 # all source are stored in SRCS-y
-SRCS-y := main.cpp tcuser.cpp SccpAddr.cpp common.cpp
+SRCS-y := main.cpp msg.cpp SccpAddr.cpp common.cpp \
+		  tcuser.cpp getimsi.cpp sccpuser.cpp
 
 ifeq ($(OS),Windows_NT)
 		PLATFORM="Windows"

@@ -1,140 +1,154 @@
 #include "tcuser.h"
-#include <utils.h>
-#include <iostream>
-#include <iomanip>
-#include <cstdio>
+#include "getimsi.h"
+#include "msg.h"
 #include "common.h"
+#include "SccpAddr.h"
+#include <errno.h>
+#include <string.h>
 
-using std::cout;
-using std::cerr;
-using std::cin;
-using std::endl;
+#define MSG1 "080301010402000f0111a10f02010102013a0407a14483153254f600"
+#define MSG2 "020601020704430200080804430100080d0ba109060704000001001a0200"
+#define TYPE1 "M-tc781-i0003"
+#define TYPE2 "M-tc783-i0003"
 
-
-ostream &operator<<(ostream & os, const param & p)
-{
-    os << "<"<< p.name << ","
-        << p.len2hexstr() << ","
-        << p.value << ">";
-    return os;
-}
-
-ostream &operator<<(ostream & os, const params & ps)
+static void 
+print_bytes(const Bytes & bytes)
 {
     uint32_t i;
-    os << ps.primitive_type << ": ";
-    for(i = 0; i < ps.vp.size(); ++i)
-      os << ps.vp[i] << " ";
-    return os;
-}
-
-
-ostream & operator<<(ostream & os, const tcuser_conf & tc)
-{
-    os  << "saddr: \t" << tc.saddr << endl
-        << "daddr: \t" << tc.daddr << endl
-        << "number:\t" << tc.number << endl
-        << "params:\t";
-    for(uint32_t i = 0; i < tc.params.size(); ++i)
-      os << tc.params[i] << " ";
-    os << endl;
-    os  << "smod:  \t" << tc.smod << endl
-        << "dmod:  \t" << tc.dmod << endl
-        << "file:  \t" << tc.filename << endl
-        << "encode:\t" << std::boolalpha <<tc.encode;
-    return os;
-}
-
-string & params::
-pack(string & hexstr) const
-{
-    uint32_t i;
-    
-    hexstr = "";
-    hexstr += primitive_type;
-    for(i = 0; i < vp.size(); ++i)
-      hexstr += vp[i].pack();
-    return hexstr;
-}
-
-int params::
-construct(const uint8_t * hexstr, int len)
-{
-    int size;
-    uint8_t * bin;
-
-    if(len % 2 == 1)
+    for(i = 0; i < bytes.size(); ++i)
     {
-        cerr << "not even len " << len << endl;
+      printf("%02x", bytes[i]);
+    }
+    cout << endl;
+}
+
+int tcuser_check_cfg(const cl_conf & conf)
+{
+    if(conf.number == "")
+    {
+        cerr << "-N option missing" << endl;
         return -1;
     }
-    
-    bin = new uint8_t[len / 2];
-    vp.clear();
-
-    size = hexstr2bin(hexstr, len, bin, len / 2);
-
-    parse_bin(bin, size);
-    
-    delete [] bin;
-    return size;
-}
-
-void params::
-parse_bin(const uint8_t * pptr, int mlen)
-{
-    uint8_t len;
-    int i, j;
-    char value[128];
-    param p;
-
-    primitive_type = hex2str(pptr, 1, false);
-    ++pptr;--mlen;
-    while(mlen > 0)
+    if(conf.saddr == "")
     {
-        if(*pptr == 0)
-        {
-            break;
-        }
-        p.name = hex2str(pptr, 1, false);
-        ++pptr;--mlen;
-        
-        len = *pptr; 
-        ++pptr;--mlen;
-        
-        for(i = 0, j = 0; i < len; ++i, ++pptr, --mlen, j+=2)
-        {
-            bin2hexstr((uint8_t *)pptr, 1, (uint8_t *)&value[j], 2);
-        }
-        value[j] = '\0';
-        p.value = value;
-        push(p);
+        cerr << "-g option missing" << endl;
+        return -1;
     }
+    if(conf.daddr == "")
+    {
+        cerr << "-a option missing" << endl;
+        return -1;
+    }
+    if(conf.filename == "")
+    {
+        cerr << "-f option missing" << endl;
+        return -1;
+    }
+    return 0;
 }
 
-void params::
-update(const param & p)
+#define FIXED_0 "A1"
+#define FIXED_1 "02010102013A04"
+#define FIXED_SZ 9
+
+static string &
+add_number(const string & n, string & cpnt)
 {
-    uint32_t i;
+    //a1 0f 02 01 01 02 01 3a 04 07 a1 44 83 15 32 54 f6
+    cout << "number : " << n << endl;
+    Bytes bytes;
+    uint8_t len;
+    string _len;
+    str2bcd(n, &bytes, (uint8_t)0xf);
+    len = FIXED_SZ + bytes.size();
+    _len = hex2str(&len, 1, false);
 
-    for(i = 0; i < vp.size(); ++i)
-      if(p == vp[i]) 
-      {
-          vp[i] = p;
-          return;
-      }
+    cpnt.clear();
+    cpnt += FIXED_0;
+    cpnt += _len;
+    cpnt += FIXED_1;
+    len = bytes.size() + 1; 
+    cpnt += hex2str(&len, 1, false);
+    cpnt += FIXED_0;
+    cpnt += hex2str(bytes.data(), bytes.size(), false);
+    cout << "cpnt:" << cpnt << endl;
+    return cpnt;
 }
+
+void
+tcap(const cl_conf & conf)
+{
+    params ps;
+    Bytes bytes;
+    SccpAddr sa;
+    string cpnt, _pack;
+    FILE * fp;
     
-int params::
-construct(const string & hexstr)
-{
-    return construct((const uint8_t *)hexstr.c_str(), hexstr.length());
-}
+    fp = fopen(conf.filename.c_str(), "w");
+    if(fp == nullptr)
+    {
+        cerr << "failed to open " << conf.filename
+            << ": " << strerror(errno) << endl;
+        exit(EXIT_FAILURE);
+    }
+    
+    sa.addrInd(PC_NO, SSN_INC, GT_T4, ROUTE_GT);
+    sa.ssn(6).natAddrInd(4).numPlan(1);
+    
+    cout << endl << endl;
 
+    cout << "********MSG1*********" << endl;
+    ps.construct(MSG1);
+    cout << "before update" << endl;
+    cout << ps << endl;
+    ps.update(param(NAME_CPNT, 
+                    add_number(conf.number, cpnt)));
+    cout << "after update" << endl;
+    cout << ps << endl;
+    cout << "pack:" << ps.pack(_pack)<< endl;
+    fprintf(fp, "%s-f%s-d%s-s00-p%s00\n", 
+                TYPE1, conf.smod.c_str(),
+                conf.dmod.c_str(), _pack.c_str());
 
-string param::
-len2hexstr(void) const
-{
-    uint8_t len = value.length() / 2;
-    return hex2str(&len, 1, false);
+    cout << endl << endl;
+
+    cout << "********MSG2*********" << endl;
+    ps.construct(MSG2); 
+    cout << "before update" << endl;
+    cout << ps << endl;
+    if(conf.encode)
+    {
+        sa.gt(conf.daddr);
+        sa.pack(&bytes);
+        print_bytes(bytes);
+
+        ps.update(param(NAME_DADDR, 
+                        hex2str(bytes.data(), 
+                            bytes.size(), 
+                            false)));
+        sa.gt(conf.saddr);
+        bytes.clear();
+        //bytes = sa.gt();
+        sa.pack(&bytes);
+        ps.update(param(NAME_SADDR, 
+                        hex2str(bytes.data(), 
+                            bytes.size(),
+                            false)));
+    }
+    else
+    {
+        ps.update(param(NAME_DADDR, conf.daddr));
+        ps.update(param(NAME_SADDR, conf.saddr));
+    }
+    cout << "after update" << endl;
+    cout << ps << endl;
+    cout << "pack:" << ps.pack(_pack)<< endl;
+    fprintf(fp, "%s-f%s-d%s-s00-p%s00\n", 
+                TYPE2, conf.smod.c_str(),
+                conf.dmod.c_str(), _pack.c_str());
+
+    cout << "\n\n*****script stored into \"" << 
+        conf.filename << "\""<< endl;
+    fclose(fp);
+
 }
